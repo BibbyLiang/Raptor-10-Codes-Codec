@@ -30,8 +30,10 @@
 *
 */
 
+//#include <vld.h>
 #include <stdio.h>
 #include <windows.h>
+
 #include "raptor_data.h"
 
 CData::CData(U8 * data, U32 len): m_Data(NULL), m_Len(0)
@@ -46,7 +48,7 @@ CData::CData(CData &other): m_Data(NULL), m_Len(0)
 
 void CData::FreeData(void)
 {
-  if (NULL != m_Data)
+  if (m_Data)
   {
     delete[] m_Data;
     m_Data = NULL;
@@ -89,15 +91,22 @@ void CData::XorData(const U8* data, U32 len)
 {
   if (len > m_Len)
   {
-    U8* tmp = new U8[len];
+    //U8* tmp = new U8[len];
+    U8* tmp;
+    tmp = (U8*)malloc(len);
     memset(tmp, 0, len);
     if (m_Len > 0)
     {
       memcpy(tmp, m_Data, m_Len);
     }
     FreeData();
-    m_Data = tmp;
+    m_Data = new U8[len];
+    memcpy(m_Data, tmp, len);
+    //m_Data = tmp;
     m_Len = len;
+    free(tmp);
+    tmp = NULL;
+    //delete[] tmp;
   }
   for (U32 i = 0; i < m_Len; ++i)
   {

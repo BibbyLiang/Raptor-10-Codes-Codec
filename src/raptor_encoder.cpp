@@ -31,6 +31,7 @@
 */
 
 #include <math.h>
+//#include <vld.h>
 
 #include "raptor_encoder.h"
 #include "raptor_common.h"
@@ -56,7 +57,7 @@ CEncoder::CEncoder(U32 K, U32 lossNum, U32 EXTNUM)
   m_N = m_K + EXTNUM;
   m_Count = 0;
 #ifndef TEST_PURPOSE
-  printf("S value: %d, H value: %d\n", m_S, m_H);
+  //printf("S value: %d, H value: %d\n", m_S, m_H);
 #endif
 
   //Load triples
@@ -86,8 +87,12 @@ CEncoder::CEncoder(U32 K, U32 lossNum, U32 EXTNUM)
   CreateMSeq();
 
   m_A = NULL;
+  //printf("Fill A Matrix.\n");
   FillA_GMatrix();
+  //printf("Solve Intermediate Symbols.\n");
   SolveIntermediateSym(m_L, m_L, m_A, m_c, m_d);
+  
+  ReleaseA_GMatrix();
 }
 
 CEncoder::~CEncoder(void)
@@ -396,7 +401,7 @@ void CEncoder::SolveIntermediateSym(U32 M, U32 L, U8** A, U32* c, U32* d)
 
     if (rowIndex == M)
     {
-      printf("Second Phase Decoding Fail! Column Num: %d\n", colIndex);
+      printf("\nSecond Phase Decoding Fail! Column Num: %d\n", colIndex);
 
 #ifdef TEST_PURPOSE
       printf("\n");
@@ -492,23 +497,23 @@ queue<CData*> CEncoder::getEncodedData(void)
   return encoded_sym;
 }
 
-void CEncoder::LTEnc(U32 k, CData* inter_sym, CTriple* triples)
+void CEncoder::LTEnc(U32 k, CData* inter_sym, CTriple* triples, CData **result)
 {
-//#ifdef TEST_PURPOSE
+#ifdef TEST_PURPOSE
   printf("\n\nOutput Encoded Symbols: \n");
-//#endif
+#endif
 
   for (U32 i = 0; i < m_N; ++i)
   {
     U32 a = triples[i].a;
     U32 b = triples[i].b;
     U32 d = triples[i].d;
-    CData* result = new CData();
+    //CData* result = new CData;
     while (b >= m_L)
     {
       b = (b + a) % m_Lp;
     }
-    result->SetData(inter_sym + b);
+    result[i]->SetData(inter_sym + b);
     U32 jend = MIN(d,m_L);
     for (U32 j = 1; j < jend; ++j)
     {
@@ -517,27 +522,27 @@ void CEncoder::LTEnc(U32 k, CData* inter_sym, CTriple* triples)
       {
         b = (b + a) % m_Lp;
       }
-      result->XorData(inter_sym + b);
+      result[i]->XorData(inter_sym + b);
     }
 
-//#ifdef TEST_PURPOSE
+#ifdef TEST_PURPOSE
 	
-    U32 length = result->GetLen();
+    U32 length = result[i]->GetLen();
     for (U32 j = 0; j < length; ++j)
     {
       U32 index = i * length + j + 1;
-      printf("%6d", result->GetData()[j]);
+      printf("%6d", result[i]->GetData()[j]);
       if ((index % SHOW_NUMS) == 0)
       {
         printf("\n");
       }
     }
-//#endif
-    encoded_sym.push(result);
+#endif
+    encoded_sym.push(result[i]);
   }
 }
 
-void CEncoder::AddData(CData* source)
+void CEncoder::AddData(CData* source, CData **result)
 {
   m_Source[m_Count + m_S + m_H].XorData(source);
 
@@ -577,6 +582,6 @@ void CEncoder::AddData(CData* source)
     //Get repair symbols
     //LTEnc[K, (C[0],..., C[L-1]), (d[i], a[i], b[i])]
     //the triple (d, a, b)=Trip[K,X]
-    LTEnc(m_K,m_Intermediate,m_Triples);
+    LTEnc(m_K,m_Intermediate,m_Triples, result);
   }
 }

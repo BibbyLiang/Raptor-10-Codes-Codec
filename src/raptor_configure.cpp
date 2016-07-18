@@ -30,9 +30,11 @@
 *
 */
 
+//#include <vld.h>
 #include <limits.h>
 #include <math.h>
 #include <assert.h> 
+
 
 #include "raptor_configure.h"
 

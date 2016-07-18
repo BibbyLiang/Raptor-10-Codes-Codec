@@ -34,6 +34,7 @@
 #include <vector>
 
 #include <windows.h>
+//#include <vld.h>
 
 #include "raptor_decoder.h"
 #include "raptor_common.h"
@@ -42,9 +43,10 @@
 using std::queue;
 using std::vector;
 
-#define DETAIL_TIME_INFO
+//#define DETAIL_TIME_INFO
 
 #define EXTEND_ROWS  20
+U32 DecodeState = 0;
 
 //#define TEST_PURPOSE 1
 
@@ -82,7 +84,7 @@ void CDecoder::ReleaseAMatrix(void)
   if (m_A)
   {
   	//printf("m_L: %d\n", m_L);
-    //for (U32 i = 0; i < m_L; ++i)
+    //for (U32 i = 0; i < m_L; ++i) 
     for (U32 i = 0; i < M; ++i)
     {
       delete [] m_A[i];
@@ -234,16 +236,17 @@ void CDecoder::GetAMatrix(U8** A, U32 M, U32 L)
   }
 }
 
-queue<CData* > CDecoder::GetIntermediateSymbols(queue<CData* > encoded)
+queue<CData* > CDecoder::GetIntermediateSymbols(queue<CData* > encoded, U32 FrameLen_now)
 {
+  DecodeState = 0;
   U32 N = (U32)encoded.size();
   U32 M = N + m_H + m_S - m_lossNum;
   U32 tempM = N + m_H + m_S;
-  printf("m_H: %d\n", m_H);
-  printf("m_S: %d\n", m_S);
-  printf("N: %d\n", N);
-  printf("M: %d\n", M);
-  printf("tempM: %d\n", tempM);
+  //printf("m_H: %d\n", m_H);
+  //printf("m_S: %d\n", m_S);
+  //printf("N: %d\n", N);
+  //printf("M: %d\n", M);
+  //printf("tempM: %d\n", tempM);
   //Get temporal A MxL bit matrix to work with.
   U8** A = new U8*[M];
 
@@ -267,7 +270,7 @@ queue<CData* > CDecoder::GetIntermediateSymbols(queue<CData* > encoded)
 
   //First S + H encoded symbols init with zero.
   U32 EncodedIndex = m_S + m_H;
-  printf("EncodedIndex: %d\n", EncodedIndex);
+  //printf("EncodedIndex: %d\n", EncodedIndex);
   U32 esiIndex = 0;
   U32 lostIndex = 0;
 
@@ -275,7 +278,7 @@ queue<CData* > CDecoder::GetIntermediateSymbols(queue<CData* > encoded)
   {
   	if(esiIndex < (m_ESI.size()))
   	{
-  	    if((m_ESI.size() - 1) == esiIndex)printf("m_ESI Size: %d\n", m_ESI.size());
+  	    //if((m_ESI.size() - 1) == esiIndex)printf("m_ESI Size: %d\n", m_ESI.size());
 	    if (m_ESI[esiIndex] == i)
 	    {
 	      //printf("%d: บวบว\n", i);
@@ -293,7 +296,7 @@ queue<CData* > CDecoder::GetIntermediateSymbols(queue<CData* > encoded)
     }
   }
   
-//#ifdef TEST_PURPOSE
+#ifdef TEST_PURPOSE
   printf("\nReceived Encoded Symbols at decoder side:\n");
   U32 index = 0;
   for (U32 i = m_S + m_H; i < M; ++i)
@@ -310,15 +313,10 @@ queue<CData* > CDecoder::GetIntermediateSymbols(queue<CData* > encoded)
     }
   }
   printf("\n");
-//#endif
+#endif
 
   //Get C, we have to solve A*C=D with gauss method. 
-  U32 SolveGaussState = SolveRevisedGauss(M, m_L, A, C, D);
-  if(SolveGaussState)
-  {
-  	//printf("Decoding Fail!\n");
-  	return encoded;
-  }
+  U32 SolveGaussState = SolveRevisedGauss(M, m_L, A, C, D, FrameLen_now);
 
   //free resources
 #if 0
@@ -359,10 +357,25 @@ queue<CData* > CDecoder::GetIntermediateSymbols(queue<CData* > encoded)
   D = NULL;
 #endif
   //free encoded symbols and intermediate symbols
+  
+  if(SolveGaussState)
+  {
+  /*
+  	while(0 != encoded.size())
+  	{
+  		encoded.pop();
+  		//printf("%d\n", encoded.size());
+  	}
+  	//printf("Decoding Fail!\n");
+  	return encoded;
+  */
+  	DecodeState = 1;
+  }
+  
   return encoded;
 }
 
-U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D)
+U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D, U32 FrameLen_now)
 {
   //init sequence
   //See reference document Page 25
@@ -518,7 +531,7 @@ U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D)
           c = NULL;
           delete[] d;
           d = NULL;
-          printf("First Phase Decoding Fail! Zero row Num: %d, M=%d, L=%d\n", zerosRowNum, M, L);
+          printf("\nFirst Phase Decoding Fail! Zero row Num: %d, M=%d, L=%d. ", zerosRowNum, M, L);
           return 1;
         }
 
@@ -711,7 +724,7 @@ U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D)
   LARGE_INTEGER liPerfNow = {0};
   QueryPerformanceCounter(&liPerfNow);
   U64 decTime = (((liPerfNow.QuadPart - m_liPerfStart.QuadPart) * 1000) / m_liPerfFreq.QuadPart);
-  printf("First Phase Decoding Time: %d\n", decTime);
+  //printf("First Phase Decoding Time: %d\n", decTime);
   
   QueryPerformanceCounter(&m_liPerfStart);
 #endif
@@ -737,7 +750,7 @@ U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D)
 #else
     if (rowIndex == M)
     {
-      printf("Second Phase Decoding Fail!\n");
+      printf("\nSecond Phase Decoding Fail! ");
       return 1;
     }
 #endif
@@ -791,7 +804,7 @@ U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D)
 
   QueryPerformanceCounter(&liPerfNow);
   decTime = (((liPerfNow.QuadPart - m_liPerfStart.QuadPart) * 1000) / m_liPerfFreq.QuadPart);
-  printf("Second Phase Decoding Time: %d\n", decTime);
+  printf("\nSecond Phase Decoding Time: %d\n", decTime);
 
   QueryPerformanceCounter(&m_liPerfStart);
 #endif
@@ -813,7 +826,7 @@ U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D)
 #ifdef DETAIL_TIME_INFO
   QueryPerformanceCounter(&liPerfNow);
   decTime = (((liPerfNow.QuadPart - m_liPerfStart.QuadPart) * 1000) / m_liPerfFreq.QuadPart);
-  printf("Third Phase Decoding Time: %d\n", decTime);
+  printf("\nThird Phase Decoding Time: %d\n", decTime);
 
   QueryPerformanceCounter(&m_liPerfStart);
 #endif
@@ -845,7 +858,7 @@ U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D)
 #ifdef DETAIL_TIME_INFO
   QueryPerformanceCounter(&liPerfNow);
   decTime = (((liPerfNow.QuadPart - m_liPerfStart.QuadPart) * 1000) / m_liPerfFreq.QuadPart);
-  printf("Fourth Phase Decoding Time: %d\n", decTime);
+  printf("\nFourth Phase Decoding Time: %d\n", decTime);
 #endif
 
 #ifdef TEST_PURPOSE
@@ -865,15 +878,17 @@ U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D)
   }
 #endif
 
-//#ifdef TEST_PURPOSE
+#ifdef TEST_PURPOSE
   printf("\n\nThe recovered Source Symbols:\n");
-//#endif
+#endif
 
 //#ifdef TEST_PURPOSE
   U32 ltDec1 = GetTickCount();
 //#endif
 
   CTripleGenerator triple_gen;
+  U32 result_count = 0;
+  U32 result_break = 0;
   for (U32 i = 0; i < m_K; ++i)
   {
     CTriple triple = triple_gen.Trip(m_K, i);
@@ -898,7 +913,7 @@ U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D)
       result->XorData(C[b]);
     }
 
-//#ifdef TEST_PURPOSE
+#ifdef TEST_PURPOSE
     U32 length = result->GetLen();      
     for (U32 j = 0; j < length; ++j)
     {
@@ -909,17 +924,47 @@ U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D)
         printf("\n");
       }
     }
-//#endif
+#endif
+
+	FILE *frc;
+	frc = fopen("result.ts", "a+b");
+	U32 length = result->GetLen(); 
+	for (U32 j = 0; j < length; ++j)
+    {
+      U32 index = i * length + j + 1;
+      //printf("%6d", result->GetData()[j]);
+      fprintf(frc, "%c", result->GetData()[j]);
+      result_count++;
+      if(result_count >= FrameLen_now)
+      {
+      	result_break = 1;
+      	break;
+      }
+      //if ((index % SHOW_NUMS) == 0)
+      //{
+        //printf("\n");
+      //}
+    }
+	fclose(frc);
+	frc = NULL;
+    
     delete result;
+    result = NULL;
+    if(result_break)
+    {
+    	break;
+    }
   }
-  printf("\n");
+  //printf("\n");
 //#ifdef TEST_PURPOSE
+
   U32 ltDec2 = GetTickCount() - ltDec1;
-  printf("LT Decoding Time: %d\n", ltDec2);
+  //printf("LT Decoding Time: %d\n", ltDec2);
 //#endif
 
 //#ifdef TEST_PURPOSE
-  printf("\n\n");
+  //printf("\n\n");
+  
 //#endif
 
   //free resources
@@ -929,7 +974,7 @@ U32 CDecoder::SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D)
   return 0;
 }
 
-queue<CData* > CDecoder::Decode(queue<CData* > encoded)
+queue<CData* > CDecoder::Decode(queue<CData* > encoded, U32 FrameLen_now)
 {
-  return GetIntermediateSymbols(encoded);
+  return GetIntermediateSymbols(encoded, FrameLen_now);
 }
