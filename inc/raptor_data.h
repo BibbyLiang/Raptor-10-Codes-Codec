@@ -39,11 +39,11 @@
 class CData
 {
 private:
-  U8   *m_Data;
+  //U8   *m_Data;
   U32  m_Len;
 
 public:
-
+  U8   *m_Data;
   CData(void): m_Data(NULL), m_Len(0)
   {
   }

@@ -67,7 +67,7 @@ public:
 
 private:
   void CreateMSeq(void);
-  void LTEnc(U32 k, CData* inter_sym, CTriple* triples);
+  void LTEnc(U32 k, CData* inter_sym, CTriple* triples, CData **result);
 
   void FillA_GMatrix(void);
   void ReleaseA_GMatrix(void);
@@ -77,7 +77,7 @@ private:
 public:
   CEncoder(U32 K, U32 lossNum, U32 EXTNUM);
   ~CEncoder(void);
-  void AddData(CData* source);
+  void AddData(CData* source, CData **result);
   std::queue<CData* > getEncodedData(void);
   std::queue<CData* > encoded_sym;
 };

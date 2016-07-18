@@ -60,16 +60,16 @@ private:
   void GetAMatrix(U8** A,U32 M,U32 L);
   void ReleaseAMatrix(void);
 
-  U32 SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D);
+  U32 SolveRevisedGauss(U32 M, U32 L, U8** A, CData** C, CData** D, U32 FrameLen_now);
 
-  std::queue<CData* > GetIntermediateSymbols(std::queue<CData* > encoded);
+  std::queue<CData* > GetIntermediateSymbols(std::queue<CData* > encoded, U32 FrameLen_now);
 
 public:
 
   CDecoder(U32 K, U32 N, U32 lossNum, std::vector<U32> ESI);
   ~CDecoder(void);
 
-  std::queue<CData* > Decode(std::queue<CData* > encoded);  
+  std::queue<CData* > Decode(std::queue<CData* > encoded, U32 FrameLen_now);  
 };
 
 #endif /* __RAPTOR_DECODER_H__ */
